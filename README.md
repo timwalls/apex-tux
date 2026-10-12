@@ -153,7 +153,7 @@ The output should look something like this:
 23:18:14 [INFO] Trying to connect to DBUS with player preference: Some("Lollypop")
 23:18:18 [INFO] Trying to connect to DBUS with player preference: Some("Lollypop")
 23:18:18 [INFO] Connected to music player: "org.mpris.MediaPlayer2.Lollypop"
-23:34:01 [INFO] Ctrl + C received, shutting down!
+23:34:01 [INFO] Termination signal received, shutting down!
 23:34:01 [INFO] unregister hotkey ALT+SHIFT+A
 23:34:01 [INFO] unregister hotkey ALT+SHIFT+D
 ```
