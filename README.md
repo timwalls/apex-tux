@@ -164,6 +164,20 @@ You may change sources by pressing **Alt+Shift+A** or **Alt+Shift+D** (This migh
 
 Hotkey support requires autostarting under an interactive daemon, i.e. by your Desktop Environment. You can also build without the `hotkey` feature and run it as a systemd service.
 
+### Using `just` (systemd user service)
+
+`just install` builds the release binary (with the `sysinfo` feature), installs it to `~/bin`, copies `settings.toml` to `~/.config/apex-tux/` (unless one is already there) and enables a systemd user service that starts with your graphical session.
+Running as part of your session gives it the session D-Bus (music player and notifications), which a system-wide service doesn't have.
+
+```shell
+just install                          # build, install and start
+just features=sysinfo,image install   # build with different features
+just bindir=$HOME/.local/bin install  # install the binary elsewhere
+just update-config                    # copy ./settings.toml over the installed one and restart
+just logs                             # follow the service's log
+just uninstall                        # remove the service and binary (keeps the config)
+```
+
 ### Desktop Environment
 
 To start on boot the binary must be started under an interactive daemon, i.e. by your Desktop Environment. A systemd service will fail unless compiled without hotkey support. Most DEs support the following method/path but you may have to find your equivalent.

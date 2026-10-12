@@ -1,0 +1,16 @@
+[Unit]
+Description=OLED display driver for SteelSeries Apex keyboards
+Documentation=https://github.com/not-jan/apex-tux
+# MPRIS and notifications live on the session D-Bus, so run as part of the
+# graphical session rather than system-wide.
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=@BINARY@
+# Exits if the keyboard isn't connected (or is unplugged); keep retrying.
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target
