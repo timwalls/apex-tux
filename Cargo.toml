@@ -35,7 +35,7 @@ futures = "0.3"
 linkme = "0.2"
 log = "0.4"
 
-ctrlc = "3"
+ctrlc = { version = "3", features = ["termination"] }
 simplelog = "0.12"
 pin-project-lite = "0.2"
 itertools = "0.14"

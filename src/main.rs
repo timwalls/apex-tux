@@ -93,14 +93,19 @@ pub async fn main() -> Result<()> {
 
     device.clear().await?;
 
-    let mut scheduler = Scheduler::new(device);
-    scheduler.start(tx.clone(), rx, settings).await?;
-
+    // This has to be registered before the scheduler starts, since `start` only
+    // returns once it receives `Command::Shutdown`. Handles SIGINT, SIGTERM
+    // and SIGHUP.
+    let shutdown_tx = tx.clone();
     ctrlc::set_handler(move || {
-        info!("Ctrl + C received, shutting down!");
-        tx.send(Command::Shutdown)
+        info!("Termination signal received, shutting down!");
+        shutdown_tx
+            .send(Command::Shutdown)
             .expect("Failed to send shutdown signal!");
     })?;
+
+    let mut scheduler = Scheduler::new(device);
+    scheduler.start(tx, rx, settings).await?;
 
     #[cfg(feature = "hotkeys")]
     drop(hkm);
