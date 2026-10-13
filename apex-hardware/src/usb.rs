@@ -7,6 +7,10 @@ use embedded_graphics::{
 };
 use hidapi::{HidApi, HidDevice};
 use num_enum::TryFromPrimitive;
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
 
 /// The SteelSeries vendor ID used to identify the USB devices
 pub static STEELSERIES_VENDOR_ID: u16 = 0x1038;
@@ -67,6 +71,20 @@ fn oled_interface(product_id: u16) -> i32 {
     }
 }
 
+/// Returns the minimum time to leave between the end of one OLED write and the
+/// start of the next, for devices that need one.
+///
+/// The Apex 5 (0x1650) acknowledges a frame sent too soon after the previous
+/// one but never displays it. On hardware, frames sent up to 45 ms after the
+/// previous write completed were dropped intermittently, and frames sent 50 ms
+/// or more after it were always shown.
+fn min_frame_gap(product_id: u16) -> Option<Duration> {
+    match product_id {
+        0x1650 => Some(Duration::from_millis(60)),
+        _ => None,
+    }
+}
+
 /// Returns the OLED write command byte for Gen 3 devices.
 /// Wired uses 0x0C, wireless dongle uses 0x4C.
 fn oled_cmd(product_id: u16) -> u8 {
@@ -85,6 +103,10 @@ pub struct USBDevice {
     /// The OLED write command byte for Gen 3 (0x0C wired, 0x4C wireless
     /// dongle).
     oled_cmd: u8,
+    /// The minimum gap between OLED writes, if the device needs one.
+    min_frame_gap: Option<Duration>,
+    /// When the last OLED write completed.
+    last_frame: Option<Instant>,
 }
 
 impl USBDevice {
@@ -103,6 +125,7 @@ impl USBDevice {
 
         let protocol = device_protocol(device.product_id());
         let oled_cmd = oled_cmd(device.product_id());
+        let min_frame_gap = min_frame_gap(device.product_id());
 
         // This requires udev rules to be setup properly.
         let handle = device.open_device(&api)?;
@@ -111,6 +134,8 @@ impl USBDevice {
             handle,
             protocol,
             oled_cmd,
+            min_frame_gap,
+            last_frame: None,
         })
     }
 
@@ -219,10 +244,18 @@ impl USBDevice {
 
         report
     }
-}
 
-impl Device for USBDevice {
-    fn draw(&mut self, display: &FrameBuffer) -> Result<()> {
+    /// Blocks until the device's minimum frame gap has passed since the last
+    /// write, so the next frame isn't silently dropped.
+    fn wait_for_frame_gap(&self) {
+        if let (Some(gap), Some(last)) = (self.min_frame_gap, self.last_frame) {
+            if let Some(remaining) = gap.checked_sub(last.elapsed()) {
+                thread::sleep(remaining);
+            }
+        }
+    }
+
+    fn send_frame(&mut self, display: &FrameBuffer) -> Result<()> {
         match self.protocol {
             DeviceProtocol::Legacy => Ok(self
                 .handle
@@ -233,6 +266,15 @@ impl Device for USBDevice {
             }
             DeviceProtocol::ChunkedGen3 => self.draw_gen3(display),
         }
+    }
+}
+
+impl Device for USBDevice {
+    fn draw(&mut self, display: &FrameBuffer) -> Result<()> {
+        self.wait_for_frame_gap();
+        let result = self.send_frame(display);
+        self.last_frame = Some(Instant::now());
+        result
     }
 
     fn clear(&mut self) -> Result<()> {
